@@ -1,0 +1,122 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function verified() {
+      return signedIn() && request.auth.token.email_verified == true;
+    }
+
+    function userPath(uid) {
+      return /databases/$(database)/documents/users/$(uid);
+    }
+
+    function isOwner() {
+      return signedIn() &&
+        (request.auth.token.owner == true ||
+          (exists(userPath(request.auth.uid)) &&
+            get(userPath(request.auth.uid)).data.role == 'owner'));
+    }
+
+    function isCustomerBooking(data) {
+      return signedIn() && data.customerId == request.auth.uid;
+    }
+
+    function validService(data) {
+      return
+        (data.serviceName == 'Scooty' && data.price == 150) ||
+        (data.serviceName == 'Bike' && data.price == 200) ||
+        (data.serviceName == 'Auto' && data.price == 300) ||
+        (data.serviceName == '4 Wheeler Body Wash' && data.price == 400) ||
+        (data.serviceName == '4 Wheeler Full Wash' && data.price == 600) ||
+        (data.serviceName == 'Heavy Vehicle' && data.price == 1200) ||
+        (data.serviceName == 'Bus or Empty Truck' && data.price == 1000);
+    }
+
+    match /users/{userId} {
+      allow create: if signedIn() && request.auth.uid == userId &&
+        request.resource.data.uid == userId &&
+        request.resource.data.role == 'customer';
+      allow read: if signedIn() && (request.auth.uid == userId || isOwner());
+      allow update: if signedIn() && request.auth.uid == userId &&
+        request.resource.data.uid == resource.data.uid &&
+        request.resource.data.role == resource.data.role &&
+        request.resource.data.email == resource.data.email &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['displayName', 'phone', 'address', 'photoUrl', 'updatedAt']);
+      allow delete: if false;
+
+      match /vehicles/{vehicleId} {
+        allow read: if signedIn() && request.auth.uid == userId;
+        allow create, update: if verified() && request.auth.uid == userId &&
+          request.resource.data.ownerId == userId &&
+          request.resource.data.number is string &&
+          request.resource.data.number.size() >= 5 &&
+          request.resource.data.number.size() <= 20;
+        allow delete: if verified() && request.auth.uid == userId;
+      }
+
+      match /fcmTokens/{tokenId} {
+        allow read, create, update, delete: if signedIn() && request.auth.uid == userId;
+      }
+
+      match /notifications/{notificationId} {
+        allow read: if signedIn() && request.auth.uid == userId;
+        allow update: if signedIn() && request.auth.uid == userId &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']) &&
+          request.resource.data.read == true;
+        allow create, delete: if false;
+      }
+    }
+
+    match /bookings/{bookingId} {
+      allow create: if verified() &&
+        request.resource.data.customerId == request.auth.uid &&
+        request.resource.data.status == 'requested' &&
+        request.resource.data.vehicleId is string &&
+        request.resource.data.vehicleNumber is string &&
+        request.resource.data.scheduledAt is timestamp &&
+        request.resource.data.scheduledAt > request.time &&
+        request.resource.data.pickupRequested is bool &&
+        validService(request.resource.data);
+      allow read: if isOwner() || isCustomerBooking(resource.data);
+      allow update: if
+        (isOwner() &&
+          request.resource.data.customerId == resource.data.customerId &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'assignedStaffId', 'updatedAt'])) ||
+        (isCustomerBooking(resource.data) &&
+          request.resource.data.status == 'cancelled' &&
+          resource.data.status in ['requested', 'confirmed'] &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'updatedAt']));
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow read: if isOwner() ||
+          (signedIn() &&
+            get(/databases/$(database)/documents/bookings/$(bookingId)).data.customerId == request.auth.uid);
+        allow create: if (verified() || isOwner()) &&
+          request.resource.data.senderId == request.auth.uid &&
+          (isOwner() ||
+            get(/databases/$(database)/documents/bookings/$(bookingId)).data.customerId == request.auth.uid) &&
+          request.resource.data.text is string &&
+          request.resource.data.text.size() > 0 &&
+          request.resource.data.text.size() <= 1000;
+        allow update, delete: if false;
+      }
+    }
+
+    match /center/{documentId} {
+      allow read: if signedIn();
+      allow write: if isOwner();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

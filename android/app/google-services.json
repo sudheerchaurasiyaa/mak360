@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "575745667399",
+    "project_id": "mak360",
+    "storage_bucket": "mak360.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:575745667399:android:cdf5a2839dcbd3f9ee5c62",
+        "android_client_info": {
+          "package_name": "com.mak360.mak360"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "575745667399-6kp1hic8ukdb42uka1q83jn1egokre62.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBksltqxIt_TPs5suMfSVVjPGtgw16aSmY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "575745667399-6kp1hic8ukdb42uka1q83jn1egokre62.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
